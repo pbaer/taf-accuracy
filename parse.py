@@ -28,6 +28,9 @@ def load_metar_taf_file(year, month, file_path):
                 continue
             prefix_format = "YYYYMMDDHHmm METAR "
             metar_str = line[len(prefix_format):].rstrip("=")
+            # Remove the RMK section, we don't need it
+            if "RMK" in metar_str:
+                metar_str = metar_str.split(" RMK")[0]
             try:
                 parsed_metar = MetarParser().parse(metar_str)
                 assert parsed_metar.message == metar_str
@@ -67,12 +70,17 @@ def load_all_metar_taf_files(root_folder):
     for root, _, files in os.walk(root_folder):
         for file in files:
             if file.endswith(".txt"):
-                print(f"Parsing {file}...")
                 file_path = os.path.join(root, file)
                 parts = file_path.split(os.sep)
                 icao = parts[-2]
                 year, month = parts[-1].split('_')
                 month = month.split('.')[0]
+
+                # Temporary
+                if icao != "KPWT":
+                    continue
+
+                print(f"Parsing {file}...")
 
                 if icao not in parsed_objects:
                     parsed_objects[icao] = {}
@@ -86,13 +94,32 @@ def load_all_metar_taf_files(root_folder):
 
     return parsed_objects
 
+def get_year_ranges(years):
+    years_list = sorted(int(y) for y in years.keys())
+    ranges = []
+    start = prev = years_list[0]
+    for year in years_list[1:]:
+        if year == prev + 1:
+            prev = year
+        else:
+            if start == prev:
+                ranges.append(f"{start}")
+            else:
+                ranges.append(f"{start}-{prev}")
+            start = prev = year
+    if start == prev:
+        ranges.append(f"{start}")
+    else:
+        ranges.append(f"{start}-{prev}")
+    return ranges
+
 def validate(parsed_objects):
-    total_days = 0
-    total_hours = 0
-    missing_taf_days = 0
-    missing_metar_hours = 0
-    for icao, _ in parsed_objects.items():
-        for year in range(2010, 2025):
+    for icao, years in parsed_objects.items():
+        total_days = 0
+        total_hours = 0
+        missing_taf_days = 0
+        missing_metar_hours = 0
+        for year in years:
             for month in range(1, 13):
                 num_days = calendar.monthrange(int(year), int(month))[1]
                 for i in range(1, num_days + 1):
@@ -105,8 +132,11 @@ def validate(parsed_objects):
                         total_hours += 1
                         if len(metars) == 0:
                             missing_metar_hours += 1
-    print(f"Percentage of missing TAF days: {missing_taf_days / total_days * 100:.2f}%")
-    print(f"Percentage of missing METAR hours: {missing_metar_hours / total_hours * 100:.2f}%")
+
+        ranges = get_year_ranges(years)
+        print(f"{icao} (years: {', '.join(ranges)})")
+        print(f"Percentage of missing TAF days: {missing_taf_days / total_days * 100:.2f}%")
+        print(f"Percentage of missing METAR hours: {missing_metar_hours / total_hours * 100:.2f}%")
 
 parsed_objects = load_all_metar_taf_files('raw_data')
 print("Successfully parsed all files")
