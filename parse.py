@@ -2,6 +2,7 @@ import calendar
 import os
 from metar_taf_parser.parser.parser import MetarParser
 from metar_taf_parser.parser.parser import TAFParser
+from normalize import normalize_metar, generate_metar_stats
 
 def load_metar_taf_file(year, month, file_path):
     num_days = calendar.monthrange(year, month)[1]
@@ -77,7 +78,7 @@ def load_all_metar_taf_files(root_folder):
                 month = month.split('.')[0]
 
                 # Temporary
-                if icao != "KPWT":
+                if icao == "KBFI":# or year != "2010":
                     continue
 
                 print(f"Parsing {file}...")
@@ -138,7 +139,23 @@ def validate(parsed_objects):
         print(f"Percentage of missing TAF days: {missing_taf_days / total_days * 100:.2f}%")
         print(f"Percentage of missing METAR hours: {missing_metar_hours / total_hours * 100:.2f}%")
 
+def normalize(parsed_objects):
+    normalized_metars = []
+    for icao, years in parsed_objects.items():
+        for year in years:
+            for month in range(1, 13):
+                num_days = calendar.monthrange(int(year), int(month))[1]
+                for i in range(1, num_days + 1):
+                    day = f"{i:02}"
+                    month_item = parsed_objects[icao][f"{year}"][f"{month:02}"]
+                    for _, metars in enumerate(month_item[day]["metars"]):
+                        for metar in metars:
+                            normalized_metars.append(normalize_metar(icao, year, month, day, metar))
+    return normalized_metars
+
 parsed_objects = load_all_metar_taf_files('raw_data')
 print("Successfully parsed all files")
 validate(parsed_objects)
+normalized_metars = normalize(parsed_objects)
+metar_stats = generate_metar_stats(normalized_metars)
 print("Validation complete")

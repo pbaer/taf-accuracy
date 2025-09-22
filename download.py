@@ -54,10 +54,12 @@ def download_historical_data(icao, year, month):
     return file_path
 
 # Download for the selected airport and date range
-icao = 'KCLM'
-for year in range(2010, 2025):
+icao = 'KBLI'
+for year in range(2006, 2010):
     for month in range(1, 13):
+        #if year == 2006 and month < 10:
+        #    continue
         print(f'Downloading data for {icao} {year}-{month:02}')
         download_historical_data(icao, year, month)
         print('Sleeping...')
-        time.sleep(60)
+        time.sleep(90)
